@@ -104,6 +104,10 @@ cka-ubuntu-machine-3:
 
 **Install additional tools** -- add packages to the `apt-get install` line in the `Dockerfile`, then rebuild the image.
 
+## Warning
+
+This project has passwords hardcoded, never use in a cloud environement, it's use is restricted for local environements. If you fork it, and push to your own github account, an warning will be produced to advise you about this proposital flaw.
+
 ## License
 
 This project is provided as-is for educational and practice purposes.
