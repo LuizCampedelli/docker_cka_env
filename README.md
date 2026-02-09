@@ -18,16 +18,25 @@ Both containers run Ubuntu 22.04 with an OpenSSH server and are connected via th
 
 ## Quick Start
 
-### 1. Build the SSH-enabled image
+### 1. Configure credentials
+
+Copy the example environment file and adjust the passwords if needed:
 
 ```bash
-docker build -t ubuntu-ssh:22.04 .
+cp .env.example .env
 ```
 
-### 2. Start the environment
+The `.env` file contains the passwords used during the image build:
+
+```
+ROOT_PASSWORD=your_root_password
+DEV_USER_PASSWORD=your_dev_password
+```
+
+### 2. Build and start the environment
 
 ```bash
-docker compose up -d
+docker compose up --build -d
 ```
 
 ### 3. Connect via SSH
@@ -48,10 +57,18 @@ docker compose down
 
 ## Default Credentials
 
-| User      | Password       | Notes                       |
-|-----------|----------------|-----------------------------|
-| `root`    | `password123`  | SSH root login enabled      |
-| `devuser` | `devpass123`   | Has `sudo` privileges       |
+Credentials are defined in the `.env` file and injected at build time:
+
+| User      | Default Password   | `.env` Variable      | Notes                  |
+|-----------|--------------------|----------------------|------------------------|
+| `root`    | `in .env`          | `ROOT_PASSWORD`      | SSH root login enabled |
+| `devuser` | `in .env`          | `DEV_USER_PASSWORD`  | Has `sudo` privileges  |
+
+To change a password, edit `.env` and rebuild:
+
+```bash
+docker compose up --build -d
+```
 
 > **Warning:** These credentials are for local practice only. Do not use this configuration in production or on publicly accessible machines.
 
@@ -80,6 +97,8 @@ Installed network utilities: `iputils-ping`, `net-tools`.
 
 ```
 .
+├── .env                  # Passwords (git-ignored)
+├── .env.example          # Example env file (safe to commit)
 ├── Dockerfile            # Ubuntu 22.04 image with SSH server
 ├── docker-compose.yml    # Two-node environment definition
 └── README.md
@@ -104,9 +123,12 @@ cka-ubuntu-machine-3:
 
 **Install additional tools** -- add packages to the `apt-get install` line in the `Dockerfile`, then rebuild the image.
 
-## Warning
+## Security Notes
 
-This project has passwords hardcoded, never use in a cloud environement, it's use is restricted for local environements. If you fork it, and push to your own github account, an warning will be produced to advise you about this proposital flaw.
+- Passwords are stored in `.env` which is git-ignored to avoid leaking credentials.
+- A `.env.example` file with placeholder values is provided for reference.
+- Never use this setup in a cloud environment or on publicly accessible machines.
+- If you fork this repo, make sure `.env` is not committed.
 
 ## License
 

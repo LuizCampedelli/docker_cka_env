@@ -16,12 +16,16 @@ RUN mkdir /var/run/sshd
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
+# Accept passwords as build arguments
+ARG ROOT_PASSWORD
+ARG DEV_USER_PASSWORD
+
 # Set root password
-RUN echo 'root:password123' | chpasswd
+RUN echo "root:${ROOT_PASSWORD}" | chpasswd
 
 # Create a non-root user (recommended)
 RUN useradd -m -s /bin/bash devuser && \
-    echo 'devuser:devpass123' | chpasswd && \
+    echo "devuser:${DEV_USER_PASSWORD}" | chpasswd && \
     usermod -aG sudo devuser
 
 # Expose SSH port

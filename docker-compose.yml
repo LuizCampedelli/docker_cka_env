@@ -1,5 +1,10 @@
 services:
   cka-ubuntu-machine-1:
+    build:
+      context: .
+      args:
+        ROOT_PASSWORD: ${ROOT_PASSWORD}
+        DEV_USER_PASSWORD: ${DEV_USER_PASSWORD}
     image: ubuntu-ssh:22.04
     container_name: cka-machine-1
     hostname: ubuntu1
@@ -20,6 +25,8 @@ services:
       - "2222:22"
     stdin_open: true
     tty: true
+    depends_on:
+      - cka-ubuntu-machine-1
 
 networks:
   docker-cka-network:
