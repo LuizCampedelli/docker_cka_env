@@ -1,0 +1,26 @@
+services:
+  cka-ubuntu-machine-1:
+    image: ubuntu-ssh:22.04
+    container_name: cka-machine-1
+    hostname: ubuntu1
+    networks:
+      - docker-cka-network
+    ports:
+      - "2221:22"
+    stdin_open: true
+    tty: true
+
+  cka-ubuntu-machine-2:
+    image: ubuntu-ssh:22.04
+    container_name: cka-machine-2
+    hostname: ubuntu2
+    networks:
+      - docker-cka-network
+    ports:
+      - "2222:22"
+    stdin_open: true
+    tty: true
+
+networks:
+  docker-cka-network:
+    driver: bridge
