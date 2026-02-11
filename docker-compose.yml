@@ -1,33 +1,138 @@
+# =============================================================================
+# CKA Practice Environment – Docker Compose
+# =============================================================================
+# Two-node Kubernetes practice cluster:
+#   cka-machine-1  (ubuntu1)  – control-plane node  – SSH port 2221
+#   cka-machine-2  (ubuntu2)  – worker node         – SSH port 2222
+#
+# IMPORTANT: Both containers run in --privileged mode with host kernel
+# module access. This is required for kubeadm, kubelet, and containerd
+# to function correctly inside a container. Use only on a trusted local
+# machine, never in production.
+#
+# Volumes explained:
+#   /lib/modules        – read-only bind mount of host kernel modules so
+#                         that modprobe overlay/br_netfilter can succeed
+#   /sys/fs/cgroup      – required by kubelet for cgroup management
+#   k8s-machine-1-etcd  – named volume persists etcd data for machine-1
+#                         so the cluster survives 'docker compose restart'
+#   k8s-machine-*-containerd – named volume persists container images so
+#                         you don't have to re-pull on every restart
+#
+# Quick start:
+#   docker compose up --build -d
+#   ssh root@localhost -p 2221   # control-plane
+#   ssh root@localhost -p 2222   # worker
+# =============================================================================
+
 services:
+
+  # ---------------------------------------------------------------------------
+  # Machine 1 – Control-plane node
+  # ---------------------------------------------------------------------------
   cka-ubuntu-machine-1:
     build:
       context: .
       args:
         ROOT_PASSWORD: ${ROOT_PASSWORD}
-        DEV_USER_PASSWORD: ${DEV_USER_PASSWORD}
-    image: ubuntu-ssh:22.04
+    # Tag the image so machine-2 can reuse it without rebuilding
+    image: ubuntu-k8s:1.31
     container_name: cka-machine-1
     hostname: ubuntu1
+
+    # -------------------------------------------------------------------------
+    # Privileged + capabilities
+    # -------------------------------------------------------------------------
+    # privileged: true gives the container full access to the host kernel,
+    # which is required for:
+    #   - modprobe (loading overlay and br_netfilter)
+    #   - iptables manipulation by kube-proxy
+    #   - mount syscalls by kubelet
+    #   - containerd's overlayfs storage driver
+    privileged: true
+
+    # -------------------------------------------------------------------------
+    # Volume mounts
+    # -------------------------------------------------------------------------
+    volumes:
+      # Host kernel modules (read-only) – allows modprobe inside the container
+      - /lib/modules:/lib/modules:ro
+      # cgroup filesystem – kubelet uses this to manage pod resource limits
+      - /sys/fs/cgroup:/sys/fs/cgroup
+      # Persist etcd data so cluster state survives container restarts
+      - k8s-machine-1-etcd:/var/lib/etcd
+      # Persist containerd images so you don't re-pull after every restart
+      - k8s-machine-1-containerd:/var/lib/containerd
+
     networks:
       - docker-cka-network
+
     ports:
+      # SSH access from the host
       - "2221:22"
+
     stdin_open: true
     tty: true
 
+    labels:
+      cka.role: "control-plane"
+      cka.k8s-version: "1.31"
+
+  # ---------------------------------------------------------------------------
+  # Machine 2 – Worker node
+  # ---------------------------------------------------------------------------
   cka-ubuntu-machine-2:
-    image: ubuntu-ssh:22.04
+    # Reuse the image built by machine-1 (no separate build step)
+    image: ubuntu-k8s:1.31
     container_name: cka-machine-2
     hostname: ubuntu2
+
+    privileged: true
+
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup
+      # Worker node does not run etcd, but kubelet still needs persistent state
+      - k8s-machine-2-kubelet:/var/lib/kubelet
+      - k8s-machine-2-containerd:/var/lib/containerd
+
     networks:
       - docker-cka-network
+
     ports:
       - "2222:22"
+
     stdin_open: true
     tty: true
+
+    # Ensure the image is built by machine-1 before machine-2 starts
     depends_on:
       - cka-ubuntu-machine-1
 
+    labels:
+      cka.role: "worker"
+      cka.k8s-version: "1.31"
+
+# =============================================================================
+# Named volumes
+# =============================================================================
+# These Docker-managed volumes outlive container removal (docker compose down).
+# Use 'docker compose down -v' to delete them and start completely fresh.
+volumes:
+  k8s-machine-1-etcd:
+  k8s-machine-1-containerd:
+  k8s-machine-2-kubelet:
+  k8s-machine-2-containerd:
+
+# =============================================================================
+# Network
+# =============================================================================
 networks:
   docker-cka-network:
     driver: bridge
+    # Use an explicit subnet so pod CIDRs don't collide with this network.
+    # kubeadm default pod CIDR for flannel is 10.244.0.0/16.
+    # The node network below (172.20.0.0/24) is deliberately outside that range.
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
